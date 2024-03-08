@@ -21,7 +21,7 @@ def visualize(pointsets, result):
 if __name__=="__main__":
     N = 9 # number of points
     # test using the simplest example
-    num = 8
+    num = 4
     device = torch.device('cuda:0')
     simplest_data = np.random.random([num ,2*N]) # [1, 18] 
     result = torch.Tensor(np.zeros([num, 8])).to(device)

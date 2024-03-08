@@ -1,109 +1,71 @@
-# Neural Network CUDA Example
-![logo](./image/logo.png)
+# Minimum Area Rectangle CUDA Operator(MARCO)
 
-Several simple examples for neural network toolkits (PyTorch, TensorFlow, etc.) calling custom CUDA operators.
+## Overview
+Overview
+The Minimum Area Rectangle CUDA Operator is a GPU-accelerated implementation for finding the minimum area rectangle that encloses a given set of points. This operator is designed to efficiently compute the minimum area rectangle using CUDA, taking advantage of parallel processing on NVIDIA cuda kernel. 
 
-We provide several ways to compile the CUDA kernels and their cpp wrappers, including jit, setuptools and cmake.
+![operator result](test_result.png)
 
-We also provide several python codes to call the CUDA kernels, including kernel time statistics and model training.
-
-*For more accurate time statistics, you'd best use **nvprof** or **nsys** to run the code.*
+## How fast we are?
+We test our operator in cpu and gpu by applying different number of pointset as our parameters. 
+From the plot, we can see that our operator is more efficient than the CPU operator on a large number of pointsets.
+![time cost VS number of pointsets](time_metric.jpg)
 
 ## Environments
-* NVIDIA Driver: 418.116.00
-* CUDA: 11.0
-* Python: 3.7.3
-* PyTorch: 1.7.0+cu110
-* TensorFlow: 2.4.1
-* CMake: 3.16.3
-* Ninja: 1.10.0
-* GCC: 8.3.0
-
-*Cannot ensure successful running in other environments.*
+* Device: NVIDIA GeForce RTX 4090(You can use this operator in any nvidia device)
+* Ubuntu 20.04.2
+* NVIDIA Driver: 550.54.14
+* CUDA: 11.6
+* Python: 3.8.18
+* PyTorch: 1.9.0+cu111
+* GCC: 9.4.0
 
 ## Code structure
 ```shell
 ├── include
-│   └── add2.h # header file of add2 cuda kernel
+│   └── min_area_rect.h # cpu operator folder
+├── cpu_operator
+│   └── min_area_rect_cpu.py # cpu operator script
+│   └── min_area_rect.ipynb # skatch notebook for opeator and showing result
 ├── kernel
-│   └── add2_kernel.cu # add2 cuda kernel
+│   └── min_area_rect.cu # cuda kernel
 ├── pytorch
-│   ├── add2_ops.cpp # torch wrapper of add2 cuda kernel
-│   ├── time.py # time comparison of cuda kernel and torch
-│   ├── train.py # training using custom cuda kernel
+│   ├── min_area_rect_ops.cpp # torch wrapper of add2 cuda kernel
 │   ├── setup.py
+│   ├── test.py # use to validate operator
 │   └── CMakeLists.txt
-├── tensorflow
-│   ├── add2_ops.cpp # tensorflow wrapper of add2 cuda kernel
-│   ├── time.py # time comparison of cuda kernel and tensorflow
-│   ├── train.py # training using custom cuda kernel
-│   └── CMakeLists.txt
-├── LICENSE
+├── time_metric.py # measure operator metric
 └── README.md
 ```
 
-## PyTorch
-### Compile cpp and cuda
-**JIT**  
-Directly run the python code.
-
 **Setuptools**  
 ```shell
-python3 pytorch/setup.py install
+python pytorch/setup.py install
 ```
 
-**CMake**  
-```shell
-mkdir build
-cd build
-cmake ../pytorch
-make
+**Usage**
+
+see example.py
+```python
+import torch
+import min_area_rect
+import numpy as np
+import time
+
+if __name__=="__main__":
+    N = 9 # number of points
+    # test using the simplest example
+    num_pointsets = [1,3,5,10,18,100,1000, 2000, 10000, 50000, 100000]
+    device = torch.device('cuda:0')
+    for num_pointset in num_pointsets:
+        # GPU operator test
+        simplest_data = np.random.random([num_pointset ,2*N]) # [1, 18] 
+        simplest_data_gpu = torch.Tensor(simplest_data).to(device)
+
+        gpu_result = torch.Tensor(np.zeros([num_pointset, 8])).to(device)
+        oper_begin = time.time()
+        min_area_rect.torch_launch_min_area_rect(simplest_data_gpu, gpu_result)
+        oper_end = time.time()
+        gpu_time = oper_end - oper_begin
+        print(f"GPU version-> avg time: {gpu_time/num_pointset * 1e-9}, num_pointsets: {num_pointset}")
 ```
-
-### Run python
-**Compare kernel running time**  
-```shell
-python3 pytorch/time.py --compiler jit
-python3 pytorch/time.py --compiler setup
-python3 pytorch/time.py --compiler cmake
-```
-
-**Train model**  
-```shell
-python3 pytorch/train.py --compiler jit
-python3 pytorch/train.py --compiler setup
-python3 pytorch/train.py --compiler cmake
-```
-
-## TensorFlow
-### Compile cpp and cuda
-**CMake**  
-```shell
-mkdir build
-cd build
-cmake ../tensorflow
-make
-```
-
-### Run python
-**Compare kernel running time**  
-```shell
-python3 tensorflow/time.py --compiler cmake
-```
-
-**Train model**  
-```shell
-python3 tensorflow/train.py --compiler cmake
-```
-
-## Implementation details (in Chinese)
-[PyTorch自定义CUDA算子教程与运行时间分析](https://godweiyang.com/2021/03/18/torch-cpp-cuda)  
-[详解PyTorch编译并调用自定义CUDA算子的三种方式](https://godweiyang.com/2021/03/21/torch-cpp-cuda-2)  
-[三分钟教你如何PyTorch自定义反向传播](https://godweiyang.com/2021/03/24/torch-cpp-cuda-3)
-
-## F.A.Q
-> **Q.** ImportError: libc10.so: cannot open shared object file: No such file or directory  
-**A.** You must do `import torch` before `import add2`.
-
-> **Q.** tensorflow.python.framework.errors_impl.NotFoundError: build/libadd2.so: undefined symbol: _ZTIN10tensorflow8OpKernelE  
-**A.** Check if `${TF_LFLAGS}` in `CmakeLists.txt` is correct.
